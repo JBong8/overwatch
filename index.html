@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오버워치 멀티플레이어 포인트 경매 드래프트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Noto+Sans+KR:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0b0f17;
+            color: #e2e8f0;
+        }
+
+        .font-overwatch {
+            font-family: 'Orbitron', 'Noto Sans KR', sans-serif;
+        }
+
+        .ow-orange { color: #f99e1a; }
+        .bg-ow-orange { background-color: #f99e1a; }
+        .border-ow-orange { border-color: #f99e1a; }
+
+        .ow-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+        }
+
+        .ow-card-a { border-top: 4px solid #3b82f6; }
+        .ow-card-b { border-top: 4px solid #ef4444; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0f17; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #f99e1a; }
+    </style>
+</head>
+<body class="min-h-screen pb-12 flex flex-col justify-between">
+
+    <div>
+        <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 mb-6 shadow-2xl">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-ow-orange p-2 rounded-xl text-slate-950 font-black text-2xl tracking-wider shadow-lg shadow-amber-500/20">
+                        OW
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-extrabold tracking-wider font-overwatch text-white flex items-center gap-2">
+                            OVERWATCH <span class="ow-orange">LIVE AUCTION</span>
+                        </h1>
+                        <p class="text-xs text-slate-400">실시간 멀티플레이어 5v5 경매 시스템</p>
+                    </div>
+                </div>
+
+                <!-- Room & Role Bar -->
+                <div id="roomStatusBar" class="flex flex-wrap items-center gap-3 hidden">
+                    <div class="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                        <span class="text-xs text-slate-400">방 코드:</span>
+                        <span id="displayRoomCode" class="font-mono font-bold text-ow-orange tracking-widest text-base">------</span>
+                        <button onclick="copyRoomCode()" class="text-slate-400 hover:text-white text-xs ml-1" title="코드 복사">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                        <span class="text-xs text-slate-400">내 역할:</span>
+                        <span id="displayMyRole" class="font-bold text-white text-sm">--</span>
+                    </div>
+
+                    <button onclick="leaveRoom()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                        방 나가기
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div id="roomJoinSection" class="max-w-md mx-auto my-12 px-4">
+            <div class="ow-card rounded-2xl p-6 shadow-2xl border border-slate-700/60 text-center">
+                <div class="w-16 h-16 bg-amber-500/10 border border-ow-orange rounded-2xl mx-auto flex items-center justify-center text-ow-orange text-3xl mb-4">
+                    <i class="fa-solid fa-satellite-dish animate-pulse"></i>
+                </div>
+                <h2 class="text-2xl font-bold font-overwatch text-white mb-2">경매방 입장하기</h2>
+                <p class="text-xs text-slate-400 mb-6">동일한 방 코드를 입력하면 여러 기기에서 실시간으로 함께 경매에 참여할 수 있습니다.</p>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-left text-xs text-slate-400 mb-1">참여 역할 선택</label>
+                        <select id="userRoleSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-ow-orange">
+                            <option value="host">👑 경매 진행자 (Host)</option>
+                            <option value="teamA">🔵 A팀 팀장</option>
+                            <option value="teamB">🔴 B팀 팀장</option>
+                            <option value="viewer">👁️ 관전 모드</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-left text-xs text-slate-400 mb-1">방 코드 (영문/숫자)</label>
+                        <input type="text" id="roomCodeInput" placeholder="예: OW2026" uppercase class="w-full uppercase tracking-widest text-center font-mono bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-base text-white focus:outline-none focus:border-ow-orange">
+                    </div>
+
+                    <div class="pt-2 flex gap-3">
+                        <button onclick="joinOrCreateRoom()" class="w-full bg-ow-orange hover:bg-amber-500 text-slate-950 font-bold py-3 rounded-lg transition text-sm shadow-lg font-overwatch tracking-wider">
+                            방 입장 / 생성
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <main id="mainAppSection" class="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-12 gap-6 hidden">
+
+            <!-- Active Auction Bidding Stage -->
+            <section class="lg:col-span-12">
+                <div class="ow-card rounded-2xl p-6 shadow-2xl relative overflow-hidden border border-slate-700/50">
+                    <div class="flex flex-col md:flex-row justify-between items-center border-b border-slate-800 pb-4 mb-6 gap-4">
+                        <div class="flex items-center gap-3">
+                            <span id="liveStatusPing" class="inline-block w-3 h-3 rounded-full bg-slate-600"></span>
+                            <h2 class="text-xl font-bold font-overwatch tracking-wide text-white">실시간 라이브 경매</h2>
+                        </div>
+                        <div id="statusBadge" class="bg-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-700">
+                            동기화 중...
+                        </div>
+                    </div>
+
+                    <div id="auctionStage" class="min-h-[220px] flex flex-col justify-center items-center">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </section>
+
+            <section class="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- TEAM A -->
+                <div class="ow-card ow-card-a rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <span class="text-xs font-bold text-blue-400 uppercase tracking-widest">TEAM A</span>
+                                <h3 class="text-2xl font-black text-white font-overwatch">팀 A</h3>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-400 block">잔여 포인트</span>
+                                <span id="teamAPoints" class="text-2xl font-extrabold text-blue-400 font-overwatch">1000 P</span>
+                            </div>
+                        </div>
+
+                        <!-- Rosters -->
+                        <div class="space-y-3 mt-4">
+                            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                                    <span class="font-bold text-slate-300"><i class="fa-solid fa-shield-halved text-sky-400 mr-1"></i> 탱커 (1)</span>
+                                    <span id="teamATankCount">0 / 1</span>
+                                </div>
+                                <div id="teamATankList" class="space-y-1"></div>
+                            </div>
+                            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                                    <span class="font-bold text-slate-300"><i class="fa-solid fa-gun text-red-400 mr-1"></i> 딜러 (2)</span>
+                                    <span id="teamADamageCount">0 / 2</span>
+                                </div>
+                                <div id="teamADamageList" class="space-y-1"></div>
+                            </div>
+                            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                                    <span class="font-bold text-slate-300"><i class="fa-solid fa-kit-medical text-emerald-400 mr-1"></i> 힐러 (2)</span>
+                                    <span id="teamASupportCount">0 / 2</span>
+                                </div>
+                                <div id="teamASupportList" class="space-y-1"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="teamABidControls" class="mt-6 pt-4 border-t border-slate-800 hidden">
+                        <p class="text-xs text-blue-400 font-bold mb-2"><i class="fa-solid fa-gavel"></i> 팀 A 실시간 입찰</p>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="placeBid('A', 10)" class="flex-1 bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-700 font-bold py-2 rounded text-sm transition">+10</button>
+                            <button onclick="placeBid('A', 50)" class="flex-1 bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-700 font-bold py-2 rounded text-sm transition">+50</button>
+                            <button onclick="placeBid('A', 100)" class="flex-1 bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-700 font-bold py-2 rounded text-sm transition">+100</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="number" id="teamACustomBid" placeholder="직접 입력" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500">
+                            <button onclick="placeCustomBid('A')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-1.5 rounded text-sm transition whitespace-nowrap">입찰</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TEAM B -->
+                <div class="ow-card ow-card-b rounded-xl p-5 shadow-lg flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <span class="text-xs font-bold text-red-400 uppercase tracking-widest">TEAM B</span>
+                                <h3 class="text-2xl font-black text-white font-overwatch">팀 B</h3>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-400 block">잔여 포인트</span>
+                                <span id="teamBPoints" class="text-2xl font-extrabold text-red-400 font-overwatch">1000 P</span>
+                            </div>
+                        </div>
+
+                        <!-- Rosters -->
+                        <div class="space-y-3 mt-4">
+                            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                                    <span class="font-bold text-slate-300"><i class="fa-solid fa-shield-halved text-sky-400 mr-1"></i> 탱커 (1)</span>
+                                    <span id="teamBTankCount">0 / 1</span>
+                                </div>
+                                <div id="teamBTankList" class="space-y-1"></div>
+                            </div>
+                            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                                    <span class="font-bold text-slate-300"><i class="fa-solid fa-gun text-red-400 mr-1"></i> 딜러 (2)</span>
+                                    <span id="teamBDamageCount">0 / 2</span>
+                                </div>
+                                <div id="teamBDamageList" class="space-y-1"></div>
+                            </div>
+                            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
+                                <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                                    <span class="font-bold text-slate-300"><i class="fa-solid fa-kit-medical text-emerald-400 mr-1"></i> 힐러 (2)</span>
+                                    <span id="teamBSupportCount">0 / 2</span>
+                                </div>
+                                <div id="teamBSupportList" class="space-y-1"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="teamBBidControls" class="mt-6 pt-4 border-t border-slate-800 hidden">
+                        <p class="text-xs text-red-400 font-bold mb-2"><i class="fa-solid fa-gavel"></i> 팀 B 실시간 입찰</p>
+                        <div class="flex gap-2 mb-2">
+                            <button onclick="placeBid('B', 10)" class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 rounded text-sm transition">+10</button>
+                            <button onclick="placeBid('B', 50)" class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 rounded text-sm transition">+50</button>
+                            <button onclick="placeBid('B', 100)" class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-700 font-bold py-2 rounded text-sm transition">+100</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="number" id="teamBCustomBid" placeholder="직접 입력" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-red-500">
+                            <button onclick="placeCustomBid('B')" class="bg-red-600 hover:bg-red-500 text-white font-bold px-4 py-1.5 rounded text-sm transition whitespace-nowrap">입찰</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="lg:col-span-4 space-y-6">
+                <!-- Host Admin Controls (Only visible for Host) -->
+                <div id="hostAdminPanel" class="ow-card rounded-xl p-5 shadow-lg hidden">
+                    <h3 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-user-gear text-ow-orange"></i> 진행자 관리 도구
+                    </h3>
+                    
+                    <form onsubmit="handleAddPlayer(event)" class="space-y-3 mb-4 pb-4 border-b border-slate-800">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">선수 이름 추가</label>
+                            <input type="text" id="playerNameInput" placeholder="예: 겐지장인" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-ow-orange">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">주 포지션</label>
+                            <select id="playerRoleInput" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-ow-orange">
+                                <option value="tank">🛡️ 탱커 (Tank)</option>
+                                <option value="damage">⚔️ 딜러 (Damage)</option>
+                                <option value="support">💉 힐러 (Support)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-ow-orange hover:bg-amber-500 text-slate-950 font-bold py-2 rounded-lg transition text-sm shadow">
+                            대기 명단에 추가
+                        </button>
+                    </form>
+
+                    <div class="flex gap-2">
+                        <button onclick="loadSamplePlayers()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-xs py-2 rounded border border-slate-700 transition">
+                            샘플 선수 불러오기
+                        </button>
+                        <button onclick="resetRoomData()" class="flex-1 bg-red-950/60 hover:bg-red-900/80 text-red-200 text-xs py-2 rounded border border-red-800 transition">
+                            방 데이터 초기화
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Unassigned Players List -->
+                <div class="ow-card rounded-xl p-5 shadow-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-list-ul text-ow-orange"></i> 대기 선수 명단
+                        </h3>
+                        <span id="unassignedCount" class="bg-slate-800 text-xs text-slate-300 font-bold px-2.5 py-1 rounded-full border border-slate-700">0명</span>
+                    </div>
+
+                    <div id="playerPoolList" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 space-y-2 pointer-events-none"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ow-auction-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "demo", authDomain: "demo.firebaseapp.com", projectId: "demo", storageBucket: "demo.appspot.com", messagingSenderId: "00000000", appId: "1:00000000:web:00000"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let currentUser = null;
+        let roomCode = null;
+        let myRole = 'viewer'; // host, teamA, teamB, viewer
+        let unsubscribeRoom = null;
+
+        // Default Room Structure
+        const defaultRoomState = {
+            teams: {
+                A: { name: '팀 A', points: 1000, roster: { tank: [], damage: [], support: [] } },
+                B: { name: '팀 B', points: 1000, roster: { tank: [], damage: [], support: [] } }
+            },
+            players: [],
+            currentAuction: null, // { player, currentBid, highestBidder }
+            updatedAt: Date.now()
+        };
+
+        let currentRoomData = null;
+
+        // Authenticate anonymously first
+        async function initAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const userCredential = await signInWithCustomToken(auth, __initial_auth_token);
+                    currentUser = userCredential.user;
+                } else {
+                    const userCredential = await signInAnonymously(auth);
+                    currentUser = userCredential.user;
+                }
+            } catch (err) {
+                console.error("Auth initialization error:", err);
+            }
+        }
+
+        initAuth();
+
+        // Join / Create Room
+        window.joinOrCreateRoom = async () => {
+            if (!currentUser) await initAuth();
+
+            const inputCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            myRole = document.getElementById('userRoleSelect').value;
+
+            if (!inputCode) {
+                showToast("방 코드를 입력해 주세요.", "error");
+                return;
+            }
+
+            roomCode = inputCode;
+
+            // Document Path: /artifacts/{appId}/public/data/rooms/{roomCode}
+            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+
+            // Listen in real-time
+            if (unsubscribeRoom) unsubscribeRoom();
+
+            unsubscribeRoom = onSnapshot(roomDocRef, (docSnap) => {
+                if (!docSnap.exists()) {
+                    // Create default state if room doesn't exist
+                    setDoc(roomDocRef, defaultRoomState);
+                } else {
+                    currentRoomData = docSnap.data();
+                    renderUI();
+                }
+            }, (error) => {
+                console.error("Firestore snapshot error:", error);
+                showToast("실시간 데이터를 불러오는 중 오류가 발생했습니다.", "error");
+            });
+
+            // UI view switch
+            document.getElementById('roomJoinSection').classList.add('hidden');
+            document.getElementById('mainAppSection').classList.remove('hidden');
+            document.getElementById('roomStatusBar').classList.remove('hidden');
+            
+            document.getElementById('displayRoomCode').innerText = roomCode;
+            
+            const roleLabels = { host: '👑 진행자', teamA: '🔵 A팀 팀장', teamB: '🔴 B팀 팀장', viewer: '👁️ 관전' };
+            document.getElementById('displayMyRole').innerText = roleLabels[myRole] || '관전';
+
+            if (myRole === 'host') {
+                document.getElementById('hostAdminPanel').classList.remove('hidden');
+            } else {
+                document.getElementById('hostAdminPanel').classList.add('hidden');
+            }
+
+            showToast(`방 [${roomCode}]에 ${roleLabels[myRole]}(으)로 접속했습니다.`, "success");
+        };
+
+        window.leaveRoom = () => {
+            if (unsubscribeRoom) unsubscribeRoom();
+            roomCode = null;
+            currentRoomData = null;
+
+            document.getElementById('roomJoinSection').classList.remove('hidden');
+            document.getElementById('mainAppSection').classList.add('hidden');
+            document.getElementById('roomStatusBar').classList.add('hidden');
+            showToast("방에서 퇴장했습니다.", "info");
+        };
+
+        window.copyRoomCode = () => {
+            if (!roomCode) return;
+            const tempInput = document.createElement('input');
+            tempInput.value = roomCode;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast("방 코드가 클립보드에 복사되었습니다.", "success");
+        };
+
+        async function updateRoomDoc(partialData) {
+            if (!roomCode || !currentUser) return;
+            try {
+                const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+                await updateDoc(roomDocRef, {
+                    ...partialData,
+                    updatedAt: Date.now()
+                });
+            } catch (err) {
+                console.error("Error updating room document:", err);
+                showToast("데이터를 동기화하지 못했습니다.", "error");
+            }
+        }
+
+        // Host Actions
+        window.handleAddPlayer = async (e) => {
+            e.preventDefault();
+            if (myRole !== 'host' || !currentRoomData) return;
+
+            const nameInput = document.getElementById('playerNameInput');
+            const roleInput = document.getElementById('playerRoleInput');
+            const name = nameInput.value.trim();
+            const role = roleInput.value;
+
+            if (!name) return;
+
+            const newPlayer = {
+                id: Date.now(),
+                name: name,
+                role: role,
+                status: 'available'
+            };
+
+            const updatedPlayers = [...(currentRoomData.players || []), newPlayer];
+            await updateRoomDoc({ players: updatedPlayers });
+
+            nameInput.value = '';
+            showToast(`${name} 선수가 대기 명단에 추가되었습니다.`, "success");
+        };
+
+        window.loadSamplePlayers = async () => {
+            if (myRole !== 'host' || !currentRoomData) return;
+
+            const samples = [
+                { id: Date.now() + 1, name: "Fearless", role: "tank", status: "available" },
+                { id: Date.now() + 2, name: "Void", role: "tank", status: "available" },
+                { id: Date.now() + 3, name: "Profit", role: "damage", status: "available" },
+                { id: Date.now() + 4, name: "Lip", role: "damage", status: "available" },
+                { id: Date.now() + 5, name: "Sp9rk1e", role: "damage", status: "available" },
+                { id: Date.now() + 6, name: "Fleta", role: "damage", status: "available" },
+                { id: Date.now() + 7, name: "Viol2t", role: "support", status: "available" },
+                { id: Date.now() + 8, name: "Shu", role: "support", status: "available" },
+                { id: Date.now() + 9, name: "Chiyo", role: "support", status: "available" },
+                { id: Date.now() + 10, name: "Fielder", role: "support", status: "available" }
+            ];
+
+            const existingNames = new Set((currentRoomData.players || []).map(p => p.name));
+            const newPlayers = samples.filter(s => !existingNames.has(s.name));
+
+            await updateRoomDoc({ players: [...(currentRoomData.players || []), ...newPlayers] });
+            showToast("샘플 선수 명단을 불러왔습니다.", "info");
+        };
+
+        window.resetRoomData = async () => {
+            if (myRole !== 'host') return;
+            const roomDocRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+            await setDoc(roomDocRef, defaultRoomState);
+            showToast("방 상태가 초기화되었습니다.", "warning");
+        };
+
+        window.startAuction = async (playerId) => {
+            if (myRole !== 'host' || !currentRoomData) return;
+
+            const player = currentRoomData.players.find(p => p.id === playerId);
+            if (!player || player.status !== 'available') return;
+
+            const teamAFull = isRoleFull('A', player.role);
+            const teamBFull = isRoleFull('B', player.role);
+
+            if (teamAFull && teamBFull) {
+                showToast(`두 팀 모두 ${ROLE_NAMES[player.role]} 자리가 꽉 찼습니다.`, "error");
+                return;
+            }
+
+            const updatedPlayers = currentRoomData.players.map(p => p.id === playerId ? { ...p, status: 'auctioning' } : p);
+
+            await updateRoomDoc({
+                players: updatedPlayers,
+                currentAuction: {
+                    player: player,
+                    currentBid: 0,
+                    highestBidder: null
+                }
+            });
+
+            showToast(`${player.name} 선수의 경매가 시작되었습니다!`, "info");
+        };
+
+        window.placeBid = (teamKey, amountToAdd) => {
+            if (!currentRoomData || !currentRoomData.currentAuction) return;
+            const currentBid = currentRoomData.currentAuction.currentBid || 0;
+            executeBid(teamKey, currentBid + amountToAdd);
+        };
+
+        window.placeCustomBid = (teamKey) => {
+            if (!currentRoomData || !currentRoomData.currentAuction) return;
+            const inputEl = document.getElementById(`team${teamKey}CustomBid`);
+            const customBid = parseInt(inputEl.value, 10);
+
+            if (isNaN(customBid)) {
+                showToast("올바른 입찰 금액을 입력하세요.", "error");
+                return;
+            }
+
+            executeBid(teamKey, customBid);
+            inputEl.value = '';
+        };
+
+        async function executeBid(teamKey, bidAmount) {
+            // Team Authorization Check
+            if ((teamKey === 'A' && myRole !== 'teamA') || (teamKey === 'B' && myRole !== 'teamB')) {
+                showToast("자신의 팀만 입찰할 수 있습니다.", "error");
+                return;
+            }
+
+            const team = currentRoomData.teams[teamKey];
+            const auction = currentRoomData.currentAuction;
+            const player = auction.player;
+
+            if (isRoleFull(teamKey, player.role)) {
+                showToast(`${team.name}는 해당 포지션 슬롯이 가득 찼습니다.`, "error");
+                return;
+            }
+
+            if (bidAmount > team.points) {
+                showToast(`보유 포인트를 초과할 수 없습니다. (잔여: ${team.points}P)`, "error");
+                return;
+            }
+
+            if (bidAmount <= auction.currentBid) {
+                showToast(`현재 최고 입찰가(${auction.currentBid}P)보다 높아야 합니다.`, "error");
+                return;
+            }
+
+            await updateRoomDoc({
+                currentAuction: {
+                    ...auction,
+                    currentBid: bidAmount,
+                    highestBidder: teamKey
+                }
+            });
+        }
+
+        window.passAuction = async () => {
+            if (myRole !== 'host' || !currentRoomData || !currentRoomData.currentAuction) return;
+
+            const player = currentRoomData.currentAuction.player;
+            const updatedPlayers = currentRoomData.players.map(p => p.id === player.id ? { ...p, status: 'available' } : p);
+
+            await updateRoomDoc({
+                players: updatedPlayers,
+                currentAuction: null
+            });
+
+            showToast(`${player.name} 선수의 경매가 유찰되었습니다.`, "warning");
+        };
+
+        window.finalizeSale = async () => {
+            if (myRole !== 'host' || !currentRoomData || !currentRoomData.currentAuction) return;
+
+            const auction = currentRoomData.currentAuction;
+            if (!auction.highestBidder) return;
+
+            const winningTeamKey = auction.highestBidder;
+            const winningTeam = currentRoomData.teams[winningTeamKey];
+            const player = auction.player;
+            const price = auction.currentBid;
+
+            // Deduct Points & Add to Roster
+            const updatedTeam = {
+                ...winningTeam,
+                points: winningTeam.points - price,
+                roster: {
+                    ...winningTeam.roster,
+                    [player.role]: [...winningTeam.roster[player.role], { ...player, finalPrice: price }]
+                }
+            };
+
+            const updatedPlayers = currentRoomData.players.map(p => p.id === player.id ? { ...p, status: 'sold' } : p);
+
+            await updateRoomDoc({
+                teams: {
+                    ...currentRoomData.teams,
+                    [winningTeamKey]: updatedTeam
+                },
+                players: updatedPlayers,
+                currentAuction: null
+            });
+
+            showToast(`🎉 ${player.name} 선수가 ${price}P로 ${winningTeam.name}에 낙찰되었습니다!`, "success");
+        };
+
+        function isRoleFull(teamKey, role) {
+            const count = (currentRoomData.teams[teamKey].roster[role] || []).length;
+            const MAX_SLOTS = { tank: 1, damage: 2, support: 2 };
+            return count >= MAX_SLOTS[role];
+        }
+
+        const MAX_SLOTS = { tank: 1, damage: 2, support: 2 };
+        const ROLE_NAMES = { tank: '탱커', damage: '딜러', support: '힐러' };
+        const ROLE_ICONS = {
+            tank: '<i class="fa-solid fa-shield-halved text-sky-400"></i>',
+            damage: '<i class="fa-solid fa-gun text-red-400"></i>',
+            support: '<i class="fa-solid fa-kit-medical text-emerald-400"></i>'
+        };
+
+        function renderUI() {
+            if (!currentRoomData) return;
+
+            // Status Indicator Ping
+            const livePing = document.getElementById('liveStatusPing');
+            livePing.className = 'inline-block w-3 h-3 rounded-full bg-emerald-500 animate-ping';
+
+            // 1. Teams Render
+            ['A', 'B'].forEach(teamKey => {
+                const team = currentRoomData.teams[teamKey];
+                document.getElementById(`team${teamKey}Points`).innerText = `${team.points} P`;
+
+                ['tank', 'damage', 'support'].forEach(role => {
+                    const listEl = document.getElementById(`team${teamKey}${capitalize(role)}List`);
+                    const countEl = document.getElementById(`team${teamKey}${capitalize(role)}Count`);
+                    const players = team.roster[role] || [];
+
+                    countEl.innerText = `${players.length} / ${MAX_SLOTS[role]}`;
+
+                    if (players.length === 0) {
+                        listEl.innerHTML = `<span class="text-slate-600 text-xs italic">비어있음</span>`;
+                    } else {
+                        listEl.innerHTML = players.map(p => `
+                            <div class="flex justify-between items-center bg-slate-800/80 px-2.5 py-1.5 rounded text-sm">
+                                <span class="font-bold text-slate-100">${p.name}</span>
+                                <span class="text-xs font-semibold text-ow-orange font-overwatch">${p.finalPrice} P</span>
+                            </div>
+                        `).join('');
+                    }
+                });
+
+                // Bid Controls Display
+                const controlsEl = document.getElementById(`team${teamKey}BidControls`);
+                const isMyTeam = (teamKey === 'A' && myRole === 'teamA') || (teamKey === 'B' && myRole === 'teamB');
+                if (currentRoomData.currentAuction && isMyTeam) {
+                    controlsEl.classList.remove('hidden');
+                } else {
+                    controlsEl.classList.add('hidden');
+                }
+            });
+
+            // 2. Current Auction Stage Render
+            const stageEl = document.getElementById('auctionStage');
+            const badgeEl = document.getElementById('statusBadge');
+            const auction = currentRoomData.currentAuction;
+
+            if (!auction) {
+                badgeEl.innerText = '경매 대기 중';
+                badgeEl.className = 'bg-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-700';
+
+                stageEl.innerHTML = `
+                    <div class="text-center py-8">
+                        <i class="fa-solid fa-gavel text-5xl text-slate-700 mb-3 animate-bounce"></i>
+                        <p class="text-slate-400 text-lg">경매를 진행할 선수를 선택 또는 대기 중입니다.</p>
+                    </div>
+                `;
+            } else {
+                badgeEl.innerText = '경매 라이브 진행 중';
+                badgeEl.className = 'bg-amber-500/20 text-ow-orange text-xs font-bold px-3 py-1.5 rounded-full border border-amber-500/40 animate-pulse';
+
+                const player = auction.player;
+                const bidderName = auction.highestBidder ? currentRoomData.teams[auction.highestBidder].name : '입찰자 없음';
+                const bidderColorClass = auction.highestBidder === 'A' ? 'text-blue-400' : auction.highestBidder === 'B' ? 'text-red-400' : 'text-slate-500';
+
+                const isHost = myRole === 'host';
+
+                stageEl.innerHTML = `
+                    <div class="w-full flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div class="flex items-center gap-4">
+                            <div class="w-20 h-20 rounded-2xl bg-slate-800 border-2 border-ow-orange/50 flex flex-col items-center justify-center shadow-inner">
+                                <span class="text-2xl">${ROLE_ICONS[player.role]}</span>
+                                <span class="text-xs font-bold text-slate-400 mt-1 uppercase">${ROLE_NAMES[player.role]}</span>
+                            </div>
+                            <div>
+                                <span class="text-xs text-ow-orange font-bold tracking-widest uppercase">경매 대상 선수</span>
+                                <h3 class="text-3xl font-black text-white font-overwatch">${player.name}</h3>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-950/80 border border-slate-800 p-4 rounded-xl text-center min-w-[200px] shadow-2xl">
+                            <span class="text-xs text-slate-400 block mb-1">현재 최고 입찰가</span>
+                            <div class="text-4xl font-black text-ow-orange font-overwatch tracking-wider mb-1">
+                                ${auction.currentBid} <span class="text-xl">P</span>
+                            </div>
+                            <span class="text-xs font-bold ${bidderColorClass}">
+                                ${auction.highestBidder ? `최고 입찰: ${bidderName}` : '입찰 시작 대기'}
+                            </span>
+                        </div>
+
+                        ${isHost ? `
+                            <div class="flex flex-row md:flex-col gap-2 w-full md:w-auto">
+                                <button onclick="finalizeSale()" ${!auction.highestBidder ? 'disabled' : ''} class="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white font-bold px-6 py-3 rounded-lg shadow-lg transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-check"></i> 낙찰 확정
+                                </button>
+                                <button onclick="passAuction()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-6 py-2 rounded-lg border border-slate-700 transition flex items-center justify-center gap-2 text-sm">
+                                    <i class="fa-solid fa-xmark"></i> 유찰 / 넘기기
+                                </button>
+                            </div>
+                        ` : `
+                            <div class="text-xs text-slate-400 bg-slate-900/90 px-4 py-3 rounded-lg border border-slate-800">
+                                <i class="fa-solid fa-clock text-ow-orange mr-1"></i> 진행자의 낙찰/유찰 처리를 대기하고 있습니다.
+                            </div>
+                        `}
+                    </div>
+                `;
+            }
+
+            // 3. Player Pool Render
+            const poolEl = document.getElementById('playerPoolList');
+            const countEl = document.getElementById('unassignedCount');
+            const availablePlayers = (currentRoomData.players || []).filter(p => p.status === 'available');
+
+            countEl.innerText = `${availablePlayers.length}명`;
+
+            if (availablePlayers.length === 0) {
+                poolEl.innerHTML = `<p class="text-slate-500 text-sm text-center py-6">대기 중인 선수가 없습니다.</p>`;
+            } else {
+                const isHost = myRole === 'host';
+                poolEl.innerHTML = availablePlayers.map(p => `
+                    <div class="bg-slate-900/80 border border-slate-800/80 hover:border-slate-700 p-3 rounded-lg flex justify-between items-center transition group">
+                        <div class="flex items-center gap-3">
+                            <span class="text-lg">${ROLE_ICONS[p.role]}</span>
+                            <div>
+                                <span class="font-bold text-white block text-sm group-hover:text-ow-orange transition">${p.name}</span>
+                                <span class="text-[10px] text-slate-400 uppercase font-semibold">${ROLE_NAMES[p.role]}</span>
+                            </div>
+                        </div>
+                        ${isHost ? `
+                            <button onclick="startAuction(${p.id})" ${currentRoomData.currentAuction ? 'disabled' : ''} class="bg-slate-800 hover:bg-ow-orange hover:text-slate-950 disabled:opacity-40 disabled:hover:bg-slate-800 disabled:hover:text-slate-300 text-slate-200 text-xs font-bold px-3 py-1.5 rounded transition">
+                                경매 시작
+                            </button>
+                        ` : ''}
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Helper Notifications
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+
+            const bgColors = {
+                info: 'bg-slate-800 border-slate-600 text-white',
+                success: 'bg-emerald-950 border-emerald-700 text-emerald-200',
+                error: 'bg-red-950 border-red-700 text-red-200',
+                warning: 'bg-amber-950 border-amber-700 text-amber-200'
+            };
+
+            toast.className = `${bgColors[type]} border px-4 py-3 rounded-lg shadow-2xl text-sm font-semibold flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+            toast.innerHTML = `<span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function capitalize(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+    </script>
+</body>
+</html>
